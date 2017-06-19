@@ -19,6 +19,7 @@
 #include <ctype.h>
 #include "webpage.h"
 #include "webpage_internal.h" // internal-use only
+#include "memory.h"
 
 /* ***************************************** */
 /* Private types */
@@ -38,7 +39,6 @@ static char *RemoveDotSegments(char *input);
 static void RemoveWhitespace(char* str);
 static int ParseURL(char* str, struct URL* url);
 static char *FixupRelativeURL(char *base, char *rel, size_t len);
-static void *checkp(void *p, char *message);
 
 /* *********************************************************************** */
 /* Private global variables */
@@ -64,9 +64,9 @@ webpage_new(char *url, const int depth, char *html)
     return NULL;
   }
 
-  webpage_t *page = checkp(malloc(sizeof(webpage_t)), "webpage_t");
+  webpage_t *page = assertp(malloc(sizeof(webpage_t)), "webpage_t");
 
-  page->url = checkp(malloc(strlen(url)+1), "page->url");
+  page->url = assertp(malloc(strlen(url)+1), "page->url");
   strcpy(page->url, url);
   page->depth = depth;
   page->html = html;
@@ -884,18 +884,4 @@ static void RemoveWhitespace(char* str)
   do {
     while (isspace(*cur)) cur++;          // consume any whitespace
   } while ((*prev++ = *cur++));            // condense to front of str
-}
-
-/**************** checkp ****************/
-/* if pointer p is NULL, print error message and die,
- * otherwise, return p unchanged.
- */
-static void *
-checkp(void *p, char *message)
-{
-  if (p == NULL) {
-    fprintf(stderr, "CHECKP: %s\n", message);
-    exit (99);
-  }
-  return p;
 }
