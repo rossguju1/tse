@@ -49,7 +49,7 @@ void webpage_delete(void *data);
  *
  * Returns true if the fetch was successful; otherwise, false. 
  * If the fetch succeeded, page->html will contain the content retrieved. 
- * Parameter page should have been allocated by the caller, 
+ * Parameter 'page' should have been allocated by the caller, 
  * but the page->html pointer is expected to be NULL. 
  * If this function is successful, a new, null-terminated character
  * buffer will be allocated as page->html. The caller must later free this
@@ -71,6 +71,11 @@ void webpage_delete(void *data);
  * Returns:
  *     True: success; caller must later free html via webpage_delete(page).
  *     False: some error fetching page.
+ * 
+ * Limitations:
+ *   * can only handle http (not https or other schemes)
+ *   * can only handle URLs of form http://host[:port][/pathname]
+ *   * cannot handle redirects (HTTP 301 or 302 response codes)
  */
 bool webpage_fetch(webpage_t *page);
 

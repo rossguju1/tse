@@ -1,10 +1,10 @@
 /* 
  * webpage - utility functions for downloading, saving, and loading web pages.
- *           See webpage.h for usage; see webpage_fetch.c for webpage_fetch().
+ *           See webpage.h for usage.
  *
  * Ira Ray Jenkins - April 2014
  * 
- * Updated by David Kotz - April 2016, 2017
+ * Updated by David Kotz - April 2016, July 2017
  * Updated by Xia Zhou - July 2016
  *
  */
@@ -15,10 +15,14 @@
 #define _GNU_SOURCE	      // strncasecmp, strdup
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdbool.h>
+#include <netdb.h>
+#include "file.h"
 #include "webpage.h"
-#include "webpage_internal.h" // internal-use only
 #include "memory.h"
 
 /* ***************************************** */
@@ -32,29 +36,61 @@ struct URL {
     char* fragment;	      // #top
 };
 
+/* webpage_t: structure to represent a web page, and its contents.
+ * The innards should not be visible to users of the webpage module.
+ */
+typedef struct webpage {
+  char *url;                               // url of the page
+  char *html;                              // html code of the page
+  size_t html_len;                         // length of html code
+  int depth;                               // depth of crawl
+} webpage_t;
+
 /* *********************************************************************** */
 /* Private function prototypes */
 
+static FILE *ConnectToHost(const char *hostname, const int port);
+static inline bool isBlankLine(const char *line);
 static char *RemoveDotSegments(char *input);
 static void RemoveWhitespace(char* str);
-static int ParseURL(char* str, struct URL* url);
 static char *FixupRelativeURL(char *base, char *rel, size_t len);
+static bool ParseURL(char* str, struct URL* url);
+static void FreeURL(struct URL url);
+static bool BurstURL(const char *url, char **hostname, 
+		     int *port, char **pathname);
+#ifdef DEBUG
+static void PrintURL(struct URL url);
+#endif // DEBUG
 
 /* *********************************************************************** */
 /* Private global variables */
 
-#define NUM_EXTS (3)			 // size of EXTS array
-static const char* EXTS[NUM_EXTS] = {	 // valid extensions
+static const int MAX_TRY = 3;    // maximum attempts to fetch
+static const int HTTP_PORT = 80; // default web server port
+
+static const char* EXTS[] = {	 // valid extensions
   "html",
-  "jsp",
-  "php"
+  "htm",     // added by DFK
+  //  "jsp", // removed by DFK
+  //  "php", // removed by DFK
+  NULL   // sentinel to end loops over this array
 };
+
+
+/* *********************************************************************** */
+/* Public methods */
 
 /* *********************************************************************** */
 /* getter methods */
-int   webpage_getDepth(const webpage_t *page) { return page ? page->depth : 0;    }
-char *webpage_getHTML(const webpage_t *page)  { return page ? page->html  : NULL; }
-char *webpage_getURL(const webpage_t *page)   { return page ? page->url   : NULL; }
+int   webpage_getDepth(const webpage_t *page) { 
+  return page ? page->depth : 0;
+}
+char *webpage_getHTML(const webpage_t *page)  { 
+  return page ? page->html  : NULL;
+}
+char *webpage_getURL(const webpage_t *page)   { 
+  return page ? page->url   : NULL; 
+}
 
 /**************** webpage_new ****************/
 webpage_t *
@@ -85,6 +121,106 @@ webpage_delete(void *data)
     if (page->html) free(page->html);
     free(page);
   }
+}
+
+
+/* ************* webpage_fetch ******************** */
+/* see webpage.h for usage documentation.
+ *
+ * Limitations:
+ *   * can only handle http (not https or other schemes)
+ *   * can only handle URLs of form http://host[:port][/pathname]
+ *   * cannot handle redirects (HTTP 301 or 302 response codes)
+ * 
+ * Pseudocode:
+ *     1. check for valid page 
+ *     2. parse url into hostname, port, and filename
+ *     3. open a connection to the given host
+ *     4. send http request
+ *     5. fetch html response
+ *     6. cleanup
+ */
+bool 
+webpage_fetch(webpage_t *page)
+{
+  // check webpage structure - must have URL and not yet have HTML
+  if (page == NULL || page->url == NULL || page->html != NULL) {
+    return false;
+  }
+
+  // burst the URL into its components;
+  // all we care about are hostname, port, and pathname
+  char *hostname; // will be initialized by BurstURL
+  int port;       // will be initialized by BurstURL
+  char *pathname; // will be initialized by BurstURL
+  if (!BurstURL(page->url, &hostname, &port, &pathname)) {
+    return false;
+  }
+
+  // attempt to connect to server 
+  FILE *http_fp = NULL; 
+  for (int try = 0;  http_fp == NULL && try < MAX_TRY; try++) {
+    // open connection - exit on error
+    http_fp = ConnectToHost(hostname, port);
+
+#ifndef NOSLEEP // CS50 students: please don't turn off the sleep!
+    sleep(1);   // sleep one second between fetches, to lighten load on server
+#endif
+  }
+
+  // failed to connect?
+  if (http_fp == NULL) {
+    return false;
+  }
+
+  // prepare and send HTTP request; receive response
+  char *httpResponse = NULL;
+  const char *httpFormat =
+    "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n";
+  if (fprintf(http_fp, httpFormat, pathname, hostname) >= 0) {
+    // ensure stdio buffer is flushed to socket
+    fflush(http_fp);
+    // read the server's response
+    httpResponse = readlinep(http_fp);
+  }
+
+  free(hostname);
+  free(pathname);
+
+  // did we succeed? check the response
+  bool success = false;
+
+  if (httpResponse != NULL) {
+    // check response code to see whether we succeeded
+    int httpResponseCode = 0;
+    if (sscanf(httpResponse, "HTTP/1.1 %d", &httpResponseCode) == 1
+	&& httpResponseCode == 200) {
+      // success! ignore the rest of the header, then grab the page
+      // read lines until we read a blank line or fail to read a line
+      char *line = readlinep(http_fp);
+      while (line != NULL && !isBlankLine(line)) {
+	free(line);
+	line = readlinep(http_fp);
+      }
+      // did we exit the loop because we read an empty line?
+      if (line != NULL) {
+	free(line); // the blank line
+
+	// then grab everything else - that should be the page content
+	char *html = readfilep(http_fp);
+	if (html != NULL) {
+	  page->html = html;
+	  success = true;
+	} 
+      }
+    }
+    free(httpResponse);
+  }
+
+  // clean up
+  fclose(http_fp);
+
+  return success;
 }
 
 /* *********************************************************************** */
@@ -192,7 +328,8 @@ webpage_getNextWord(webpage_t *page, int pos, char **word)
  *     9. fixup relative links
  *    10. create new character buffer for result and return it
  */
-int webpage_getNextURL(webpage_t *page, int pos, char **result)
+int 
+webpage_getNextURL(webpage_t *page, int pos, char **result)
 {
   // make sure we have text and base url
   if (page == NULL || page->html == NULL || page->url == NULL) {
@@ -316,21 +453,14 @@ int webpage_getNextURL(webpage_t *page, int pos, char **result)
  *     5. remove dot segments and lowercase scheme and host
  *     6. put the url back together
  */
-bool NormalizeURL(char *url) 
+bool 
+NormalizeURL(char *url) 
 {
   bool status = true;
   int valid_ext;
   struct URL tmp;                          // url struct for parsing
   char *dot;
   char *slash;
-
-  // initialize struct
-  tmp.scheme = NULL;
-  tmp.user = NULL;
-  tmp.host = NULL;
-  tmp.path = NULL;
-  tmp.query = NULL;
-  tmp.fragment = NULL;
 
   // test url
   if (!url) { return 0; }
@@ -352,7 +482,7 @@ bool NormalizeURL(char *url)
       if (strlen(dot) > 0) {
 	// check all valid extensions
 	valid_ext = 0;
-	for (int i = 0; i < NUM_EXTS; i++) {
+	for (int i = 0; EXTS[i] != NULL; i++) {
 	  if (!strncasecmp(dot, EXTS[i], strlen(EXTS[i]))) {
 	    valid_ext = 1; break;
 	  }
@@ -431,7 +561,8 @@ bool NormalizeURL(char *url)
 /***********************************************************************
  * IsInternalURL - see webpage.h for interface description.
  */
-bool IsInternalURL(char *url)
+bool
+IsInternalURL(char *url)
 {
   if (NormalizeURL(url)) {
     if (strncmp(url, INTERNAL_URL_PREFIX, strlen(INTERNAL_URL_PREFIX)) == 0) {
@@ -452,10 +583,13 @@ bool IsInternalURL(char *url)
 /***********************************************************************
  * ParseURL - attempts to parse str into a URL struct
  * @str: absolute url to parse
- * @url: struct containing parts of a url
+ * @url: pointer to a struct containing parts of a url; 
+ *       inbound, its members are assumed uninitialized
+ *       outbound, its members are initialized to NULL or malloc'd memory.
+ *       Caller is later responsible for calling FreeURL(url) to free that space.
  *
- * Expects str to be an absolute url. Returns 0 if str cannot be
- * successfully parsed; otherwise, returns 1.
+ * Expects str to be an absolute url. Returns false if str cannot be
+ * successfully parsed; otherwise, returns true.
  *
  * From RFC 3986 chapter 3:
  *
@@ -471,7 +605,8 @@ bool IsInternalURL(char *url)
  *
  * Should have no use outside of this file, thus declared static.
  */
-static int ParseURL(char* str, struct URL* url)
+static bool
+ParseURL(char* str, struct URL* url)
 {
   int host_len;                            // length of host segment
   char *scheme_end;                        // scheme end point, : or :/ or ://
@@ -485,13 +620,21 @@ static int ParseURL(char* str, struct URL* url)
 
   // make sure we have a str and url struct
   if (!str || !url) {
-    return 0;
+    return false;
   }
 
+  // initialize the structure
+  url->scheme = NULL;
+  url->user = NULL;
+  url->host = NULL;
+  url->path = NULL;
+  url->query = NULL;
+  url->fragment = NULL;
+  
   // make sure absolute url, i.e., ':' must preceede any '/', '?', or '#'
   scheme_end = strpbrk(str, ":/?#");
   if (!scheme_end || *scheme_end != ':') {
-    return 0;
+    return false;
   }
 
   scheme_end++;                            // consume ':'
@@ -504,7 +647,7 @@ static int ParseURL(char* str, struct URL* url)
   // allocate url scheme
   url->scheme = calloc(scheme_end - str + 1, sizeof(char));
   if (!url->scheme) {
-    return 0;
+    return false;
   }
 
   // lowercase it
@@ -525,7 +668,7 @@ static int ParseURL(char* str, struct URL* url)
     // allocate user
     url->user = calloc(user_end - scheme_end + 1, sizeof(char));
     if (!url->user) {
-      return 0;
+      return false;
     }
 
     // copy user info
@@ -556,7 +699,7 @@ static int ParseURL(char* str, struct URL* url)
   // allocate host
   url->host = calloc(host_len + 1 , sizeof(char));
   if (!url->host) {
-    return 0;
+    return false;
   }
 
   // lowercase it
@@ -570,14 +713,14 @@ static int ParseURL(char* str, struct URL* url)
   if (path_end) {                           // .../path? or .../path#
     url->path = calloc(path_end - host_e + 1, sizeof(char));
     if (!url->path) {
-      return 0;
+      return false;
     }
 
     strncpy(url->path, host_e, path_end - host_e);
   } else {                                 // .../path
     url->path = calloc(&str[strlen(str)] - host_e + 1, sizeof(char));
     if (!url->path) {
-      return 0;
+      return false;
     }
 
     strcpy(url->path, host_e);
@@ -589,7 +732,7 @@ static int ParseURL(char* str, struct URL* url)
   if (frag_beg) {                           // have fragment
     url->fragment = calloc(&str[strlen(str)] - frag_beg + 1, sizeof(char));
     if (!url->fragment) {
-      return 0;
+      return false;
     }
 
     strcpy(url->fragment, frag_beg);
@@ -601,21 +744,158 @@ static int ParseURL(char* str, struct URL* url)
   if (query_beg && !frag_beg) {             // ...?name=value
     url->query = calloc(&str[strlen(str)] - query_beg + 1, sizeof(char));
     if (!url->query) {
-      return 0;
+      return false;
     }
 
     strcpy(url->query, query_beg);
   } else if (query_beg && frag_beg && query_beg < frag_beg) { // ...?name=value#top
     url->query = calloc(frag_beg - query_beg + 1, sizeof(char));
     if (!url->query) {
-      return 0;
+      return false;
     }
 
     strncpy(url->query, query_beg, frag_beg - query_beg);
   }
 
-  return 1;                                // if we got this far, good
+  return true;                                // if we got this far, good
 }
+
+/* ****************** FreeURL ***************************** */
+/* free the members of the URL struct - but not the struct itself.
+ */
+static void 
+FreeURL(struct URL url)
+{
+  if (url.scheme) { free(url.scheme); }
+  if (url.user)   { free(url.user); }
+  if (url.host)   { free(url.host); }
+  if (url.path)   { free(url.path); }
+  if (url.query)  { free(url.query); }
+  if (url.fragment) { free(url.fragment); }
+}
+
+
+#ifdef DEBUG
+/* ****************** PrintURL ***************************** */
+/* Print members of the URL struct - for debugging.
+ */
+static void 
+PrintURL(struct URL url)
+{
+  printf("URL ");
+  printf("scheme '%s'; ", url.scheme);
+  printf("user '%s'; ", url.user);
+  printf("host '%s'; ", url.host);
+  printf("path '%s'; ", url.path);
+  printf("query '%s'; ", url.query);
+  printf("fragment '%s'; ", url.fragment);
+  printf("\n");
+}
+#endif // DEBUG
+
+/* ****************** BurstURL ********************* */
+/* Burst the URL into components (hostname, port, pathname).
+ *
+ * Input: URL, assumed non-NULL and already normalized.
+ * 
+ * Output: fill in the other parameters:
+ *   a pointer to new string containing the hostname
+ *   an integer representing the port
+ *   a pointer to new string containing the pathname.
+ * and
+ *   return true if successful. 
+ * 
+ * If success, the hostname and pathname must be free'd later.
+ * Each string is allocated enough space to hold the whole URL, 
+ * which is more than necessary, allowing a little growth if needed.
+ * 
+ * BurstURL is much simpler than ParseURL and is used by 
+ * webpage_fetch because it can't handle anything other than simple
+ * http://hostname[:port][/path] forms of URL anyway.
+ */
+static bool
+BurstURL(const char *url, char **hostname, int *port, char **pathname)
+{
+  // make plenty of space for the resulting strings
+  int length = strlen(url);
+
+  // initialize hostname to empty string
+  *hostname = calloc(sizeof(char), length); // initialized to all nulls
+  if (*hostname == NULL) {
+    return false;
+  }
+
+  // initialize pathname to slash
+  *pathname = calloc(sizeof(char), length); // initialized to all nulls
+  if (*pathname == NULL) {
+    free(*hostname);
+    return false;
+  } else {
+    **pathname = '/';
+  }
+
+  // initialize port to default port
+  *port = HTTP_PORT;
+
+  // parse various forms of the URL
+  if (sscanf(url, "http://%[^:]:%d/%s", *hostname, port, *pathname+1) == 3) {
+    return true;
+  } else if (sscanf(url, "http://%[^/]/%s", *hostname, *pathname+1) == 2) {
+    return true;
+  } else if (sscanf(url, "http://%[^:]:%d", *hostname, port) == 2) {
+    return true;
+  } else if (sscanf(url, "http://%[^/]/", *hostname) == 1) {
+    return true;
+  } else if (sscanf(url, "http://%s", *hostname) == 1) {
+    return true;
+  } else {
+    free(*hostname); *hostname = NULL;
+    free(*pathname); *pathname = NULL;
+    return false;
+  }
+}
+
+
+/* ********************* ConnectToHost ************************** */
+/* Connect to the given hostname and port, 
+ * returning an open FILE* for the socket,
+ * or NULL on failure.
+ */
+static FILE *
+ConnectToHost(const char *hostname, const int port)
+{
+  // Look up the hostname specified on command line
+  struct hostent *hostp = gethostbyname(hostname);
+  if (hostp == NULL) {
+    return NULL;
+  }
+
+  // Initialize fields of the server address
+  struct sockaddr_in server;  // address of the server
+  server.sin_family = AF_INET;
+  bcopy(hostp->h_addr_list[0], &server.sin_addr, hostp->h_length);
+  server.sin_port = htons(port);
+
+  // Create socket (a file descriptor)
+  int comm_sock = socket(AF_INET, SOCK_STREAM, 0);
+  if (comm_sock < 0) {
+    return NULL;
+  }
+
+  // And connect that socket to that server   
+  if (connect(comm_sock, (struct sockaddr *) &server, sizeof(server)) < 0) {
+    return NULL;
+  }
+
+  // to make it easier to work with, switch to stdio
+  FILE *http_fp = fdopen(comm_sock, "r+");
+  if (http_fp == NULL) {
+    return NULL;
+  }
+
+  return http_fp;
+}
+
 
 /* ***************************************************************** */
 /*
@@ -650,7 +930,8 @@ static int ParseURL(char* str, struct URL* url)
  * be used in advertising or otherwise to promote the sale, use or other dealings
  * in this Software without prior written authorization of the copyright holder.
  */
-static char *RemoveDotSegments(char *input)
+static char *
+RemoveDotSegments(char *input)
 {
   size_t in_len;                           // input length
   size_t copy_len;                         // copy length
@@ -775,7 +1056,8 @@ static char *RemoveDotSegments(char *input)
  * Should have no use outside of this file, thus declared static.
  */
 
-static char *FixupRelativeURL(char *base, char *rel, size_t len)
+static char *
+FixupRelativeURL(char *base, char *rel, size_t len)
 {
   char *abs_url;                           // absolute url to build
   char *slash;                             // right-most '/' in a path
@@ -791,14 +1073,6 @@ static char *FixupRelativeURL(char *base, char *rel, size_t len)
   if (!abs_url) {
     return NULL;
   }
-
-  // initialize struct
-  tmp.scheme = NULL;
-  tmp.user = NULL;
-  tmp.host = NULL;
-  tmp.path = NULL;
-  tmp.query = NULL;
-  tmp.fragment = NULL;
 
   // attempt to parse the base url
   if (!ParseURL(base, &tmp)) {
@@ -851,12 +1125,7 @@ static char *FixupRelativeURL(char *base, char *rel, size_t len)
   // we can ignore the base query and fragment, they shouldn't apply
 
  cleanup:                                     // cleanup memory
-  if (tmp.scheme)   { free(tmp.scheme); }
-  if (tmp.user)     { free(tmp.user); }
-  if (tmp.host)     { free(tmp.host); }
-  if (tmp.path)     { free(tmp.path); }
-  if (tmp.query)    { free(tmp.query); }
-  if (tmp.fragment) { free(tmp.fragment); }
+  FreeURL(tmp);
 
   return abs_url;
 }
@@ -873,7 +1142,8 @@ static char *FixupRelativeURL(char *base, char *rel, size_t len)
  *
  * Should have no use outside of this file, thus declared static.
  */
-static void RemoveWhitespace(char* str)
+static void
+RemoveWhitespace(char* str)
 {
   char *prev;                              // previous whitespace
   char *cur;                               // current non-whitespace
@@ -884,4 +1154,19 @@ static void RemoveWhitespace(char* str)
   do {
     while (isspace(*cur)) cur++;          // consume any whitespace
   } while ((*prev++ = *cur++));            // condense to front of str
+}
+
+/* **************** isBlankLine ******************/
+/* Input: line, a non-NULL pointer to a string.
+ * Return true if the string is pointing to a blank line, that is, 
+ * an empty string, or
+ * with only newline (LF), only carriage return (CR), or only CRLF.
+ */
+static inline bool
+isBlankLine(const char *line)
+{
+  return (   (line[0] == '\0')
+	  || (strcmp(line, "\n") == 0) 
+	  || (strcmp(line, "\r") == 0) 
+	  || (strcmp(line, "\r\n") == 0));
 }

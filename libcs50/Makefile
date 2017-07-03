@@ -1,12 +1,12 @@
 # Makefile for CS50 library
 #   Builds and compiles all these utility functions into a library.
 #
-# David Kotz, April 2016, 2017
+# David Kotz, April 2016, July 2017
 # updated by Xia Zhou, July 2016
 
 # object files, and the target library
 OBJS = bag.o counters.o file.o hashtable.o jhash.o memory.o \
-       set.o webpage.o webpage_fetch.o
+       set.o webpage.o
 LIB = libcs50.a
 
 # add -DNOSLEEP to disable the automatic sleep after web-page fetches
@@ -31,8 +31,7 @@ hashtable.o: hashtable.h set.h jhash.h
 jhash.o: jhash.h
 memory.o: memory.h
 set.o: set.h
-webpage.o:  webpage.h webpage_internal.h
-webpage_fetch.o:  webpage.h webpage_internal.h
+webpage.o:  webpage.h
 
 .PHONY: clean sourcelist
 
