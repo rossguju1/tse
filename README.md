@@ -23,7 +23,7 @@ To get started,
 	 * edit `crawler/Makefile`
 	 * edit `crawler/crawler.c`
 
-See [Lab 4 instructions](http://www.cs.dartmouth.edu/~cs50/Labs/Lab4.html)
+See [Lab 4 instructions](http://www.cs.dartmouth.edu/~cs50/Labs/Lab4)
 for more information.
 
 ## A replacement README
