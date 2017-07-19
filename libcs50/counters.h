@@ -9,6 +9,7 @@
  * asking for the relevant key.
  * 
  * David Kotz, April 2016, 2017
+ * Xia Zhou, July 2017
  */
 
 #ifndef __COUNTERS_H
@@ -27,8 +28,9 @@ counters_t *counters_new(void);
 /* Increment the counter indicated by key; key must be >= 0.
  * If the key does not yet exist, create a counter for it and initialize to 1.
  * Ignore if ctrs is NULL or key is negative.
+ * Return the new value of the counter related to the inserted key
  */
-void counters_add(counters_t *ctrs, const int key);
+int counters_add(counters_t *ctrs, const int key);
 
 /* Return current value of counter associated with the given key;
  * return 0 if ctrs is NULL or if key is not found.
