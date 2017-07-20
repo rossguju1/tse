@@ -32,7 +32,7 @@ Replace this README.md with the following, and add more information as needed.
 ```
 # CS50 Tiny Search Engine
 
-My Name - April 2017
+My Name - Summer 2017
 
 To build, run `make`.
 
