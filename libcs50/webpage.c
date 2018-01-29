@@ -263,7 +263,7 @@ webpage_getNextWord(webpage_t *page, int pos, char **word)
     if (doc[pos] == '<') {
       end = strchr(&doc[pos], '>');    // find the close
       
-      if (end == '\0' || (++end) == '\0') { // ran out of html
+      if (end == NULL || *(++end) == '\0') { // ran out of html
 	return -1;
       }
 
