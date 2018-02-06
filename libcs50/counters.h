@@ -18,7 +18,7 @@
 #include <stdio.h>
 
 /**************** global types ****************/
-typedef struct counters counters_t;  // opaque to users of the module
+typedef struct ctrs counters_t;  // opaque to users of the module
 
 /**************** functions ****************/
 

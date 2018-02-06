@@ -15,7 +15,7 @@
 #include <stdbool.h>
 
 /**************** global types ****************/
-typedef struct hashtable hashtable_t;  // opaque to users of the module
+typedef struct ht hashtable_t; // opaque to users of the module
 
 /**************** functions ****************/
 
