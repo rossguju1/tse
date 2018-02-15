@@ -63,46 +63,31 @@ set_t *set_new(void)
  * return true iff new item was inserted.
  */
 
-bool
+ bool
 set_insert(set_t *set, const char *key, void *item)
 {
 
-  if (set != NULL && item != NULL && key != NULL) {
-    // allocate a new node to be added to the list
-      setnode_t *new = setnode_new(key,item);
-      if (new == NULL){
-        return false; //return false if new node is not created
-      }
-
-      if (set->head == NULL) {  //If set has no items
-        set->head = new;  //Make the new Node the head of the set 
-      } else {
-        setnode_t *currentNode = set->head;
-        //compare key for head
-        if (strcmp(currentNode->key, key) == 0 ){ //If key exists, return false
-            //Also free the node
-            count_free(new->key);
-            count_free(new);
-            return false;
-          }
-        while ( currentNode->next != NULL ){  //reach the end of the list
-          if (strcmp(currentNode->key, key) == 0 ){ //If key exists, return false
-            //Also free the node
-            count_free(new->key);
-            count_free(new);
-            return false;
-          }
-          currentNode = currentNode->next; 
-        }
-        currentNode->next = new;
-      }
-      
-      return true;
-
-  } else {
-    return false;
-  }
-
+        if (set == NULL || key == NULL || item == NULL) {
+                // either set was bad or item/key  is null      
+                return false;
+        } else if (set->head == NULL) {    // if set is empty make node
+                setnode_t *node = setnode_new(key, item);
+                set->head = node;          // set the new node to be the head
+        } else {
+                setnode_t *node = setnode_new(key, item); // make new node
+                // let current node point to the head of the set
+        for (setnode_t *current = set->head; current != NULL; current = current->next) {                         // loop through set
+                  if ((strcmp(key, current->key) == 0)) {  //if current->key is the same  string as key 
+                      count_free(node->key);
+                      count_free(node);        //free key and node
+                      return false;
+                  } 
+                
+                else { 
+                  current->next = node; 
+                }
+              }
+        } return true;
 #ifdef MEMTEST
   count_report(stdout, "After set_insert");
 #endif
@@ -116,26 +101,20 @@ set_insert(set_t *set, const char *key, void *item)
 
 void *set_find(set_t *set, const char *key)
 {
-  if (set == NULL) {
-    return NULL; // bad set
-  } else if (set->head == NULL) {
-    return NULL; // set is empty
-  } else if (key == NULL){
-    return NULL; // key is NULL
-  } else {
-       setnode_t *currentNode = set->head;
-        while ( currentNode != NULL ){  //iterate through all items
-          if (strcmp(currentNode->key, key) == 0 ){ //If key matches, return item
-            return currentNode->item;
-          }
-          currentNode = currentNode->next;
-        }
-        return NULL; //not found
-  }
-
-}
-
-        
+        if (set == NULL) {
+                return NULL; // bad set
+        } else if (set->head == NULL) {
+                return NULL; // empty set
+        } else {
+                for (setnode_t *node = set->head; node != NULL; node = node->next) {
+                        if (node->key == key ) {
+                        // return the item if current->key matches the key 
+                        return node->item;
+                   } 
+                 }   // return null if key is not matched
+                        return NULL;
+              }
+            }
 
 /**************** setnode_new ****************/
 /* Allocate and initialize a setnode */
@@ -226,22 +205,32 @@ void set_iterate(set_t *set, void *arg,
  */
 
 
-void 
+void
 set_delete(set_t *set, void (*itemdelete)(void *item) )
 {
   if (set != NULL) {
     for (setnode_t *node = set->head; node != NULL; ) {
-      if (itemdelete != NULL) {       // if possible...
-        (*itemdelete)(node->item);      // delete node's item
+      if (itemdelete != NULL) {
+        (*itemdelete)(node->item);          // delete node's item
       }
-      count_free(node->key);      //delete node's key
-      //node->key == NULL;
-      setnode_t *next = node->next;     // remember what comes next
-      count_free(node);         // free the node
-      node = next;          // and move on to next
+      count_free(node->key);
+      setnode_t *next = node->next;
+      count_free(node);                     // free the node
+      node = next;                          // and key and continue
     }
-
     count_free(set);
-    
   }
+#ifdef MEMTEST
+  count_report(stdout, "End of set_delete");
+#endif
 }
+
+
+
+
+
+
+
+
+
+

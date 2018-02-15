@@ -17,11 +17,15 @@ FLAGS = # -DNOSLEEP # -DMEMTEST
 
 CFLAGS = -Wall -pedantic -std=c11 -ggdb $(FLAGS)
 CC = gcc
+
 MAKE = make
 
 # Build the library by archiving object files
 $(LIB): $(OBJS)
 	ar cr $(LIB) $(OBJS)
+
+
+
 
 # Dependencies: object files depend on header files
 bag.o: bag.h

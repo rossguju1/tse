@@ -81,97 +81,123 @@ static ctrsnode_t *ctrsnode_new(const int key, int count)
   }
 
 
-
-
 /*********************** counters_add()*******************/
 /* Increment the counter indicated by key; key must be >= 0.
  * If the key does not yet exist, create a counter for it and initialize to 1.
  * Ignore if ctrs is NULL or key is negative.
- */
-
+*/
 void counters_add(counters_t *ctrs, const int key)
-{	// do nothing if ctrs is null or key is neg
-        if ( ctrs == NULL || key < 0) {
-                return; 
-        } else if (ctrs->head == NULL) {
-                ctrsnode_t *node = ctrsnode_new(key, 1);
-                if (!node) {    //check if node mem was allocated
-                        return;
-                }
-                ctrs->head = node;
+{
 
-        } else {
-	       	ctrsnode_t *last_node = ctrs->head; 
-		// last_node will be set to current when current->next = NULL
-              for (ctrsnode_t *current = ctrs->head; current != NULL; current= current->next) {
-                if ( current->key == key ) {
-			// if matching key, increament 
-                         current->count = current->count + 1;
-                         return;
-                } else if (current->next == NULL) {
-			// current is located at the last node
-                        last_node = current;
-                }
-              }
-              ctrsnode_t *node = ctrsnode_new(key, 1);
-              if (!node) {    // check if node mem was allocated
-                   return;
-              }
-              last_node->next = node;
+  if (ctrs != NULL && key >= 0) {  //Ignore if ctrs is NULL or key is negative.
+    if (ctrs->head == NULL) {  //If counters has no items
+      // allocate a new node to be added to the head
+      ctrsnode_t *new = ctrsnode_new(key,1);
+      if (new == NULL){
+          return; //return if new node is not created
         }
+      ctrs->head = new;
+    } else {  //If counters has item
+      ctrsnode_t *current = ctrs->head;
+      ctrsnode_t *tailnode = ctrs->head;  //last item
+     for ( ; current != NULL; current = current->next) {  //loop through all counters
+        if (current-> key == key ) {  //counter with given key exists
+          current->count = current->count + 1;
+          return; 
+        }
+        //update the tail node
+        if (current->next == NULL){
+          tailnode = current;
+        }
+      } 
+      //if reached here, that means given key does not exist yet
+      // allocate a new node to be added to the counters
+      ctrsnode_t *new = ctrsnode_new(key,1);
+      if (new == NULL){
+          return; //return if new node is not created
+        }
+      tailnode->next = new;
+    }
+  }
+
+
+#ifdef MEMTEST
+  count_report(stdout, "After counters_add");
+#endif
 }
 
-    
 
 /********************** counters_get() ************************/
 /* Return current value of counter associated with the given key;
  * return 0 if ctrs is NULL or if key is not found.
  */
 
-int counters_get(counters_t *ctrs, const int key)
+int 
+counters_get(counters_t *ctrs, const int key)
 {
-        if (ctrs == NULL) { 
-	//ctrs set doesnt exist
-                return 0;
-        } else {
-        for (ctrsnode_t *current = ctrs->head; current != NULL; current = current->next) {
-                   if ( current->key == key ) {
-			// matching key, return count   
-                        return current->count;
-                     }
-                }
-                return 0;
+  if (ctrs == NULL) {
+    return 0; // bad counters
+  } else if (ctrs->head == NULL) {
+    return 0; // counters is empty
+  } else if (key < 0){
+    return 0; // key is negative
+  } else {
+    ctrsnode_t *current = ctrs->head;
+        while ( current != NULL ){  //iterate through all items
+          if (key == current->key){ //If key matches, return count
+            return current->count;
+          }
+          current = current->next;
         }
+        return 0; //not found
+  }
 }
+
+
 /************************** counters_set() ************************/
 /* Set the current value of counter associated with the given key;
  * If the key does not yet exist, create a counter for it and initialize to
  * the given value. Ignore if ctrs is NULL, if key < 0, or count < 0.
  */
 
-void counters_set(counters_t *ctrs, const int key, int count)
+void 
+counters_set(counters_t *ctrs, const int key, int count)
 {
-        if (key < 0 || count < 0 || ctrs == NULL) {
-	// bad cases
-                return;
-        } else {
-        ctrsnode_t *current = ctrs->head;
-        while (current->next != NULL) {
-		//matching key, set current node's count to input count
-                if ( current->key == key) {
-                current->count = count;
-                return;
-                } current = current->next;
-        }  //we are at the bottom of set, make new node
-         ctrsnode_t *node = ctrsnode_new(key, count);
-                   if (!node) {   // check memory allocation
-                          return;
-                   }
-                current->next = node;
-                return;
-               }
+  if (ctrs == NULL) {
+    return; // bad counters
+  } else if (count < 0){
+    return; // count is negative
+  } else if (key < 0){
+    return; // key is negative
+  } else if (ctrs->head == NULL) { //counters is empty
+    //add the key and set its count
+    counters_add(ctrs,key);
+    ctrs->head->count = count;
+  } else {
+    ctrsnode_t *currentnode = ctrs->head;
+    ctrsnode_t *tailnode = ctrs->head;
+        while ( currentnode != NULL ){  //iterate through all items
+          if (key == currentnode->key){ //If key matches, set the count
+            currentnode->count = count;
+            return;
+          }
+          if (currentnode->next == NULL){
+            tailnode = currentnode;
+          }
+          currentnode = currentnode->next;
         }
-
+        //If here, means key was not found
+        //create a new node and set its count
+        //add it to the end of the linkedlist
+        ctrsnode_t *node = ctrsnode_new(key,count);
+        if (node == NULL) {
+          // error allocating memory for node; return error
+          return;
+        } else {
+          tailnode->next = node;
+        }
+  }
+}
 
 /******************** counters_print***********************/
 
@@ -180,12 +206,12 @@ void counters_set(counters_t *ctrs, const int key, int count)
  */
 
 void counters_print(counters_t *ctrs, FILE *fp)
-{     
-       	// ignore cases when fp/ctrs == NULL
+{
+        // ignore cases when fp/ctrs == NULL
         if ( fp != NULL) {
           if (ctrs != NULL) {
                 fputc('{', fp);
-		// print counter set 
+                // print counter set 
                 for (ctrsnode_t *current = ctrs->head; current != NULL; current = current->next) {
                     fputc('(', fp);
                     fprintf(fp, "%d", current->key);
@@ -200,8 +226,9 @@ void counters_print(counters_t *ctrs, FILE *fp)
         }
       }
    }
-    
-/*********************** counters_iterate() ********************/
+
+
+   /*********************** counters_iterate() ********************/
 /* Iterate over all counters in the set (in undefined order):
  * call itemfunc for each item, with (arg, key, count).
  * If ctrs==NULL or itemfunc==NULL, do nothing.
@@ -209,12 +236,12 @@ void counters_print(counters_t *ctrs, FILE *fp)
 
 void counters_iterate(counters_t *ctrs, void *arg,
                       void (*itemfunc)(void *arg, const int key, int count))
-{	
-	// do nothing case
+{
+        // do nothing case
         if (ctrs == NULL || itemfunc == NULL) {
                 return;
         } else {
-		// go through whole counter set and apply itemfunc
+                // go through whole counter set and apply itemfunc
             for (ctrsnode_t *current = ctrs->head; current != NULL; current = current->next) {
                         (*itemfunc)(arg, current->key, current->count);
                 }
@@ -225,23 +252,23 @@ void counters_iterate(counters_t *ctrs, void *arg,
 
 /* Delete the whole counters. ignore NULL ctrs. */
 
-void counters_delete(counters_t *ctrs)
-{	
-	// ctrs set doesn't exist
-	// no memory to free
-        if ( ctrs == NULL) {
-                return;
-        } else {
-		// go through counter set
-                for (ctrsnode_t *current = ctrs->head; current != NULL; ) {
-                ctrsnode_t *next = current->next;
-		//free current node first
-                count_free(current);
-                current = next;
-                }
-		//free ctrs set	
-           count_free(ctrs);
-        }
+void 
+counters_delete(counters_t *ctrs)
+{
+  if (ctrs != NULL) {
+    for (ctrsnode_t *node = ctrs->head; node != NULL;  ) {
+      
+      ctrsnode_t *next = node->next;     // remember what comes next
+      count_free(node);         // free the node
+      node = next;          // and move on to next
     }
 
+    count_free(ctrs);
+  }
+
+#ifdef MEMTEST
+  count_report(stdout, "End of counters_delete");
+#endif
+
+}
 
