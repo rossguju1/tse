@@ -1,0 +1,14 @@
+[flume:querier] 249) ./querier /net/ifs-users/rguju/cs50/labs/lab4/tse/querier/RunTests/crawler-output-small  /net/ifs-users/rguju/cs50/labs/lab4/tse/querier/RunTests/SMALL_TEST
+
+
+KEY WORDS:> edit or feb or variant or released or written or typical
+Query: edit or feb or variant or released or written or typical
+Matches 6 documents (Ranked) 
+Score: 62 Doc: 3 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Hash_table.html
+Score: 61 Doc: 6 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/C_(programming_language).html
+Score: 59 Doc: 7 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Computer_science.html
+Score: 52 Doc: 2 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Linked_list.html
+Score: 45 Doc: 4 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Dartmouth_College.html
+Score: 34 Doc: 5 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Unix.html
+KEY WORDS:> 
+

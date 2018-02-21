@@ -1,0 +1,13 @@
+[flume:querier] 249) ./querier /net/ifs-users/rguju/cs50/labs/lab4/tse/querier/RunTests/crawler-output-small  /net/ifs-users/rguju/cs50/labs/lab4/tse/querier/RunTests/SMALL_TEST
+
+
+KEY WORDS:> prone or category or abstraction and various
+Query: prone or category or abstraction and various
+Matches 6 documents (Ranked) 
+Score: 8 Doc: 5 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Unix.html
+Score: 6 Doc: 7 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Computer_science.html
+Score: 5 Doc: 6 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/C_(programming_language).html
+Score: 2 Doc: 2 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Linked_list.html
+Score: 2 Doc: 3 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Hash_table.html
+Score: 1 Doc: 4 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Dartmouth_College.html
+KEY WORDS:> 

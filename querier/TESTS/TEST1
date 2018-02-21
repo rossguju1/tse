@@ -1,0 +1,19 @@
+[flume:querier] 248) ./querier /net/ifs-users/rguju/cs50/labs/lab4/tse/querier/RunTests/crawler-output-small  /net/ifs-users/rguju/cs50/labs/lab4/tse/querier/RunTests/SMALL_TEST
+KEY WORDS:> consisting or level and been
+Query: consisting or level and been
+Matches 5 documents (Ranked) 
+Score: 10 Doc: 6 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/C_(programming_language).html
+Score: 8 Doc: 5 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Unix.html
+Score: 3 Doc: 2 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Linked_list.html
+Score: 3 Doc: 7 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Computer_science.html
+Score: 1 Doc: 4 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Dartmouth_College.html
+KEY WORDS:> consisting and level or been            
+Query: consisting and level or been
+Matches 6 documents (Ranked) 
+Score: 15 Doc: 4 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Dartmouth_College.html
+Score: 15 Doc: 6 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/C_(programming_language).html
+Score: 11 Doc: 7 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Computer_science.html
+Score: 10 Doc: 5 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Unix.html
+Score: 2 Doc: 2 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Linked_list.html
+Score: 1 Doc: 3 ~>  http://old-www.cs.dartmouth.edu/~cs50/data/tse/wikipedia/wiki/Hash_table.html
+KEY WORDS:> 
